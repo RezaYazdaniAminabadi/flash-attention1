@@ -31,7 +31,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <cuda_fp16.h>
 
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
 #include <cuda_bf16.h>
@@ -272,12 +271,28 @@ static inline __device__ uint32_t hmin2(uint32_t a, uint32_t b) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static inline __device__ uint32_t hmul2(const uint32_t a, const uint32_t b) {
+static inline __device__ uint32_t hmul2(const uint32_t a, const uint32_t b, bool is_bf16=false) {
     // uint32_t c;
     // asm volatile("mul.f16x2 %0, %1, %2;\n" : "=r"(c) : "r"(a), "r"(b));
     // return c;
-    __half2 result = __hmul2(reinterpret_cast<const __half2 (&)>(a),
+    uint32_t result;
+    #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+    if (is_bf16){
+        __nv_bfloat162 &result_h = reinterpret_cast<__nv_bfloat162(&)>(result);
+        result_h = __hmul2(reinterpret_cast<const __nv_bfloat162 (&)>(a),
+                             reinterpret_cast<const __nv_bfloat162 (&)>(b));
+        // if ((threadIdx.x == 0) && (blockIdx.x == 0) && (blockIdx.y == 0)) printf("I am here\n");
+    }
+    else{
+        __half2 &result_h = reinterpret_cast<__half2(&)>(result);
+        result_h = __hmul2(reinterpret_cast<const __half2 (&)>(a),
                              reinterpret_cast<const __half2 (&)>(b));
+    }
+    #else
+        __half2 &result_h = reinterpret_cast<__half2(&)>(result);
+        result_h = __hmul2(reinterpret_cast<const __half2 (&)>(a),
+                             reinterpret_cast<const __half2 (&)>(b));
+    #endif
     return reinterpret_cast<uint32_t(&)>(result);
 }
 

@@ -27,7 +27,11 @@
 
 #include "fmha.h"
 #include "fmha_block_fprop_kernel_1xN.h"
+#include <cuda_fp16.h>
+#include <cuda_bf16.h>
 
+#include "static_switch.h"
+#include "fp16_switch.h"
 template<typename Kernel_traits, bool Is_dropout, bool Is_causal, bool Return_softmax>
 __global__ void fmha_block_fprop_fp16_sm80_loop_kernel(FMHA_fprop_params params) {
     fmha::device_block_1xN_loop<Kernel_traits, Is_dropout, Is_causal, Return_softmax>(params);
@@ -77,14 +81,16 @@ void run_fmha_block_fp16_sm80_loop_(Launch_params<FMHA_fprop_params> &launch_par
 
 void run_fmha_block_fp16_sm80(Launch_params<FMHA_fprop_params> &launch_params,
                              const bool configure) {
-    if (launch_params.params.d == 16) {
-        using Kernel_traits = FMHA_kernel_traits<256, 16, 16, 1, 4, 0x08u>;
-        run_fmha_block_fp16_sm80_loop_<Kernel_traits>(launch_params, configure);
-    } else if (launch_params.params.d == 32) {
-        using Kernel_traits = FMHA_kernel_traits<256, 32, 16, 1, 4, 0x08u>;
-        run_fmha_block_fp16_sm80_loop_<Kernel_traits>(launch_params, configure);
-    } else if (launch_params.params.d == 64) {
-        using Kernel_traits = FMHA_kernel_traits<256, 64, 16, 1, 4, 0x08u>;
-        run_fmha_block_fp16_sm80_loop_<Kernel_traits>(launch_params, configure);
-    }
+    FP16_SWITCH(launch_params.params.is_bf16, [&] {
+        if (launch_params.params.d == 16) {
+            using Kernel_traits = FMHA_kernel_traits<256, 16, 16, 1, 4, 0x08u, elem_type>;
+            run_fmha_block_fp16_sm80_loop_<Kernel_traits>(launch_params, configure);
+        } else if (launch_params.params.d == 32) {
+            using Kernel_traits = FMHA_kernel_traits<256, 32, 16, 1, 4, 0x08u, elem_type>;
+            run_fmha_block_fp16_sm80_loop_<Kernel_traits>(launch_params, configure);
+        } else if (launch_params.params.d == 64) {
+            using Kernel_traits = FMHA_kernel_traits<256, 64, 16, 1, 4, 0x08u, elem_type>;
+            run_fmha_block_fp16_sm80_loop_<Kernel_traits>(launch_params, configure);
+        }
+    } );
 }

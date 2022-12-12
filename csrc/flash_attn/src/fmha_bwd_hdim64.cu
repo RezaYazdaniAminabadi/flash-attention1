@@ -5,7 +5,8 @@
 #include "fmha_bwd_launch_template.h"
 
 void run_fmha_bwd_hdim64(FMHA_dgrad_params &params, cudaStream_t stream, const bool configure) {
-    FP16_SWITCH(params.is_bf16, ({
+    // work around for MSVC issue
+    FP16_SWITCH(params.is_bf16, [&] {
         auto dprops = at::cuda::getCurrentDeviceProperties();
         if (params.seqlen_k == 128) {
             using Kernel_traits = FMHA_kernel_traits<128, 64, 16, 1, 8, 0x08u, elem_type>;
@@ -26,5 +27,5 @@ void run_fmha_bwd_hdim64(FMHA_dgrad_params &params, cudaStream_t stream, const b
                 run_fmha_bwd_loop<Kernel_traits>(params, stream, configure);
             }
         }
-    }));
+    });
 }

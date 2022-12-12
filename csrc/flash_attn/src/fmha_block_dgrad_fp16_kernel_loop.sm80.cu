@@ -3,7 +3,8 @@
 
 #include "fmha.h"
 #include "fmha_block_dgrad_kernel_1xN_loop.h"
-
+#include "static_switch.h"
+#include "fp16_switch.h"
 template<typename Kernel_traits, bool Is_dropout, bool Is_causal, int loop_steps=-1>
 __global__ void fmha_block_dgrad_fp16_sm80_dq_dk_dv_loop_kernel(FMHA_dgrad_params params) {
     fmha::compute_block_dq_dk_dv_1xN<Kernel_traits, Is_dropout, Is_causal, loop_steps>(params);
@@ -51,14 +52,16 @@ void run_fmha_block_dgrad_fp16_sm80_loop_(const FMHA_dgrad_params &params, cudaS
 }
 
 void run_fmha_block_dgrad_fp16_sm80(const FMHA_dgrad_params &params, cudaStream_t stream) {
-    if (params.d == 16) {
-        using Kernel_traits = FMHA_kernel_traits<256, 16, 16, 1, 8, 0x08u>;
-        run_fmha_block_dgrad_fp16_sm80_loop_<Kernel_traits>(params, stream);
-    } else if (params.d == 32) {
-        using Kernel_traits = FMHA_kernel_traits<256, 32, 16, 1, 8, 0x08u>;
-        run_fmha_block_dgrad_fp16_sm80_loop_<Kernel_traits>(params, stream);
-    } else if (params.d == 64) {
-        using Kernel_traits = FMHA_kernel_traits<256, 64, 16, 1, 8, 0x100u>;
-        run_fmha_block_dgrad_fp16_sm80_loop_<Kernel_traits>(params, stream);
-    }
+    FP16_SWITCH(params.is_bf16, [&] {
+        if (params.d == 16) {
+            using Kernel_traits = FMHA_kernel_traits<256, 16, 16, 1, 8, 0x08u, elem_type>;
+            run_fmha_block_dgrad_fp16_sm80_loop_<Kernel_traits>(params, stream);
+        } else if (params.d == 32) {
+            using Kernel_traits = FMHA_kernel_traits<256, 32, 16, 1, 8, 0x08u, elem_type>;
+            run_fmha_block_dgrad_fp16_sm80_loop_<Kernel_traits>(params, stream);
+        } else if (params.d == 64) {
+            using Kernel_traits = FMHA_kernel_traits<256, 64, 16, 1, 8, 0x100u, elem_type>;
+            run_fmha_block_dgrad_fp16_sm80_loop_<Kernel_traits>(params, stream);
+        }
+    });
 }

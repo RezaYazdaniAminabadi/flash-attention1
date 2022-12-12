@@ -524,9 +524,9 @@ mha_fwd_block(const at::Tensor &q,         // total_q x num_heads x head_size, t
     bool is_dropout = p_dropout > 0.0;
     Launch_params<FMHA_fprop_params> launch_params(dprops, stream, is_dropout, return_softmax);
 
-    TORCH_CHECK(q.dtype() == torch::kFloat16);
-    TORCH_CHECK(k.dtype() == torch::kFloat16);
-    TORCH_CHECK(v.dtype() == torch::kFloat16);
+    //TORCH_CHECK(q.dtype() == torch::kFloat16);
+    //TORCH_CHECK(k.dtype() == torch::kFloat16);
+    //TORCH_CHECK(v.dtype() == torch::kFloat16);
     TORCH_CHECK(cu_seqlens_q.dtype() == torch::kInt32);
     TORCH_CHECK(cu_seqlens_k.dtype() == torch::kInt32);
     TORCH_CHECK(blockmask.dtype() == torch::kInt32);
@@ -656,14 +656,14 @@ mha_bwd_block(const at::Tensor &dout,  // total x num_heads, x head_size
     bool is_dropout = p_dropout > 0.0;
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-    TORCH_CHECK(q.dtype() == torch::kFloat16);
-    TORCH_CHECK(k.dtype() == torch::kFloat16);
-    TORCH_CHECK(v.dtype() == torch::kFloat16);
-    TORCH_CHECK(out.dtype() == torch::kFloat16);
-    TORCH_CHECK(dout.dtype() == torch::kFloat16);
-    TORCH_CHECK(dq.dtype() == torch::kFloat16);
-    TORCH_CHECK(dk.dtype() == torch::kFloat16);
-    TORCH_CHECK(dv.dtype() == torch::kFloat16);
+    //TORCH_CHECK(q.dtype() == torch::kFloat16);
+    //TORCH_CHECK(k.dtype() == torch::kFloat16);
+    //TORCH_CHECK(v.dtype() == torch::kFloat16);
+    //TORCH_CHECK(out.dtype() == torch::kFloat16);
+    //TORCH_CHECK(dout.dtype() == torch::kFloat16);
+    //TORCH_CHECK(dq.dtype() == torch::kFloat16);
+    //TORCH_CHECK(dk.dtype() == torch::kFloat16);
+    //TORCH_CHECK(dv.dtype() == torch::kFloat16);
     TORCH_CHECK(cu_seqlens_q.dtype() == torch::kInt32);
     TORCH_CHECK(cu_seqlens_k.dtype() == torch::kInt32);
     TORCH_CHECK(blockmask.dtype() == torch::kInt32);

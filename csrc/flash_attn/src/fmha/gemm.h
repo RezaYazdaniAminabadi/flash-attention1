@@ -135,10 +135,10 @@ struct alignas(static_cast<int>(Base_::ALIGNMENT)) Fragment : public Base_ {
     }
 
     // Multiply by another fragment.
-    inline __device__ void hmul(const Fragment &other) {
+    inline __device__ void hmul(const Fragment &other, bool is_bf16=false) {
         #pragma unroll
         for( int ii = 0; ii < Base_::NUM_REGS; ++ii ) {
-            this->reg(ii) = fmha::hmul2(this->reg(ii), other.reg(ii));
+            this->reg(ii) = fmha::hmul2(this->reg(ii), other.reg(ii), is_bf16);
         }
     }
 
@@ -349,6 +349,18 @@ inline __device__ void gemm_cl(Acc (&acc)[M][N], const A (&a)[M], const B (&b)[N
     // mma_op(c_cl, a_cl, b_cl, c_cl);
     #pragma unroll
     for (int iter = 0; iter < kIters; iter++) {
+        //unsigned const* A = (unsigned const*)(&a_cl[iter]);
+        //unsigned const* B = (unsigned const*)(&b_cl[iter]);
+        //float const* C = (float const*)(&c_cl);
+        //float* D = (float*)(&c_cl);
+        //__asm__ __volatile__(
+        //    "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+        //    "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%10,%11,%12,%13};\n" 
+        //    : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3]), 
+        //    "+r"(A[0]), "+r"(A[1]), "+r"(A[2]), "+r"(A[3]), 
+        //    "+r"(B[0]), "+r"(B[1]), 
+        //    "+f"(C[0]), "+f"(C[1]), "+f"(C[2]), "+f"(C[3])
+        //);
         mma_op(c_cl, reinterpret_cast<const typename WarpMma::FragmentA (&)>(a_cl[iter]),
                reinterpret_cast<const typename WarpMma::FragmentB (&)>(b_cl[iter]), c_cl);
     }

@@ -42,8 +42,9 @@ def convert_blockmask(blockmask, causal):
 
 def _flash_blocksparse_attn_forward(qkv, cu_seqlens, blockmask, dropout_p, max_s, softmax_scale,
                                      causal, return_softmax):
-    context, softmax_lse, *rest = flash_attn_cuda.fwd_block(qkv, cu_seqlens, blockmask, dropout_p,
-                                                             max_s, softmax_scale, causal,
+    q, k, v = qkv[:, 0], qkv[:, 1], qkv[:, 2]
+    context, softmax_lse, *rest = flash_attn_cuda.fwd_block(q, k, v, cu_seqlens, cu_seqlens, blockmask,
+                                                             max_s, max_s, dropout_p, softmax_scale, causal,
                                                              return_softmax, None)
     # if context.isnan().any() or softmax_lse.isnan().any():
     #     breakpoint()
@@ -51,10 +52,18 @@ def _flash_blocksparse_attn_forward(qkv, cu_seqlens, blockmask, dropout_p, max_s
     return context, softmax_lse, S_dmask
 
 
-def _flash_blocksparse_attn_backward(dout, qkv, out, S_dmask, softmax_lse, cu_seqlens, blockmask,
+def _flash_blocksparse_attn_backward(dout, dqkv, qkv, out, S_dmask, softmax_lse, cu_seqlens, blockmask,
                                       dropout_p, max_s, softmax_scale, causal):
-    dqkv, dp, softmax_d = flash_attn_cuda.bwd_block(dout, qkv, out, S_dmask, softmax_lse, cu_seqlens,
-                                                     blockmask, dropout_p, softmax_scale, max_s,
+    q, k, v = qkv[:, 0], qkv[:, 1], qkv[:, 2]
+    dout = dout.contiguous()
+    dq, dk, dv, _ = flash_attn_cuda.bwd_block(dout, q, k, v, out, softmax_lse, 
+                                                     dqkv[:, 0],
+                                                     dqkv[:, 1],
+                                                     dqkv[:, 2],
+                                                     cu_seqlens, cu_seqlens,
+                                                     blockmask, 
+                                                     max_s, max_s,
+                                                     dropout_p, softmax_scale,
                                                      causal, None)
     # if dqkv.isnan().any() or softmax_d.isnan().any():
     #     breakpoint()
@@ -87,8 +96,9 @@ class FlashBlocksparseAttnFun(torch.autograd.Function):
             cur_rng_state = torch.cuda.get_rng_state()
             torch.cuda.set_rng_state(rng_state)
         # S_dmask is None, temporarily use another tensor just to get it running
+        dqkv = torch.empty_like(qkv)
         dqkv = _flash_blocksparse_attn_backward(
-            dout, qkv, context, context, softmax_lse, cu_seqlens, blockmask, ctx.dropout_p,
+            dout, dqkv, qkv, context, context, softmax_lse, cu_seqlens, blockmask, ctx.dropout_p,
             ctx.max_s, ctx.softmax_scale, ctx.causal
         )
         if rng_state is not None:
