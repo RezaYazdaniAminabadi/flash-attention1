@@ -646,7 +646,8 @@ inline __device__ void compute_block_dq_dk_dv_1xN_one_iter(const Params &params,
             Is_last
             || ((loop_step_idx + 1) * Cta_tile_p::N >= binfo.actual_seqlen_k)
             || ((mask_val & 0x2) != 0)
-            || ((Is_causal) && (block_row_idx * Cta_tile_p::M < (loop_step_idx + 1) * Cta_tile_p::N));
+            //|| ((Is_causal) && (block_row_idx * Cta_tile_p::M < (loop_step_idx + 1) * Cta_tile_p::N))
+            ;
         if (is_final_write) {
             // if (Is_dropout) {
             //     dq_out[0] = fmha::fmul4(dq_out[0], params.rp_dropout);

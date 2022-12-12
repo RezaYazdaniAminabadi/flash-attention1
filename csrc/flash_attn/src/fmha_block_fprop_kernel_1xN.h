@@ -92,7 +92,7 @@ inline __device__ void device_block_1xN_(const Params &params, const int bidb, c
     const BlockInfoPadded<Kernel_traits::THREADS> binfo(params, bidb, bidh, tidx);
     // if( binfo.stop_early() ) return;
     if( binfo.stop_early(loop_step_idx * Cta_tile_p::N) ) return;
-    auto nn = loop_step_idx * Cta_tile_p::N;
+
     Blockmask blockmask(params, loop_step_idx);
     int block_row_idx = 0;
     int mask_val = blockmask.mask_val(0);
@@ -210,20 +210,20 @@ inline __device__ void device_block_1xN_(const Params &params, const int bidb, c
 
     Smem_softmax_sum smem_softmax_lse(reinterpret_cast<float *>(&smem_[Gemm1::SMEM_BYTES]), tidx);
 
+    auto nn = loop_step_idx * Cta_tile_p::N;
     // Load over the entire sequence length.
-    for( int l = 0; l < steps; l++ ) {
-        // if ((threadIdx.x == 0) && (blockIdx.x == 0) && (blockIdx.y == 0)) {
-        //     printf("block_row_idx = %d\n", block_row_idx);
-        // }
-        auto mm = l * Cta_tile_p::M;
-        if (mm >= binfo.actual_seqlen_q || (Is_causal && nn > mm)) break;
+
+    for( int l = (!Is_causal || loop_step_idx < 2) ? 0 : (nn / Cta_tile_p::N); l < steps; l++ ) {
         
+        auto mm = block_row_idx * Cta_tile_p::M;
+        if (mm >= binfo.actual_seqlen_q) break;
+
         const bool is_final_write =
             Is_last
-            || ((loop_step_idx + 1) * Cta_tile_p::N >= binfo.actual_seqlen_k)
+            || ((nn +  Cta_tile_p::N) >= binfo.actual_seqlen_k)
             || ((mask_val & 0x2) != 0)
-            || (Is_causal) && (nn + Cta_tile_p::N) > mm;
-        // if (block_row_idx * Cta_tile_p::M >= binfo.actual_seqlen_q) break;
+            || (Is_causal && ((mm < 512 && loop_step_idx == 1))); // TODO: Need to better formulize this 
+            
 
         int mask_val_next = l < steps - 1 ? blockmask.mask_val(l + 1) : -1;
         // if ((threadIdx.x == 0) && (blockIdx.x == 0) && (blockIdx.y == 0)) {
